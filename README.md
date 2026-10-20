@@ -19,6 +19,8 @@ Aloud with Hark**.
 |---|---|---|
 | ![Idle bar](docs/bar-idle.png) | ![Bar menu](docs/bar-menu.png) | ![Bar while reading](docs/bar-reading.png) |
 
+![Read Aloud window highlighting the sentence being read](docs/read-aloud-window.png)
+
 ## Features
 
 - **Two-sided transcripts.** "Me" and "Them" are recorded as separate tracks, so
