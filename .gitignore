@@ -1,0 +1,5 @@
+# SwiftPM build cache and the assembled .app (both made by build.sh)
+.build/
+build/
+.swiftpm/
+.DS_Store
