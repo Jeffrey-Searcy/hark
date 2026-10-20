@@ -108,6 +108,10 @@ Open `Hark-<version>.dmg` and drag Hark to Applications. On first launch Hark
 downloads its models (about 2.1 GB, one time) and sets up Read Aloud. Nothing
 else to install.
 
+If your copy is not notarized by Apple, macOS first says it "could not verify"
+Hark. Open it once, click **Done**, then go to System Settings → Privacy &
+Security, scroll down, and click **Open Anyway** next to the Hark message.
+
 ## Build from source
 
 You also need the Xcode Command Line Tools (`xcode-select --install`) and
@@ -165,8 +169,9 @@ HARK_NOTARY_PROFILE="hark-notary" ./release.sh
 ```
 
 `HARK_NOTARY_PROFILE` is the name you saved with
-`xcrun notarytool store-credentials`. `./release.sh --unsigned` makes a test build
-that only opens on the Mac that built it. Output goes to `build/release/`.
+`xcrun notarytool store-credentials`. Without a paid Apple Developer account, use
+`./release.sh --unsigned`: the same self-contained DMG, but other Macs need the
+**Open Anyway** step above the first time. Output goes to `build/release/`.
 
 ## Recover a recording by hand
 

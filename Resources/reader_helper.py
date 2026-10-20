@@ -21,12 +21,17 @@ so it never outlives the app.
 import argparse
 import json
 import os
+import re
 import sys
 import traceback
 import wave
 
 # Kokoro voice ids start with a language letter: a = American English, b = British English.
 LANG_BY_PREFIX = {"a": "en-us", "b": "en-gb"}
+
+# Footnote and section-edit marks from wiki pages: [12], [a], [edit], [citation needed], [note 3].
+# why: single letters only in lowercase, so quote edits like "[T]he court said" keep their letter.
+REFERENCE_MARK = re.compile(r"\[\s*(?:\d+|[a-z]|(?i:edit|citation needed|note \d+))\s*\]")
 
 
 def send(channel, message):
@@ -60,6 +65,19 @@ def speak(kokoro, voices, request):
     return {}
 
 
+def strip_reference_marks(text):
+    """Removes wiki-style marks that make no sense spoken aloud.
+
+    trafilatura keeps the visible text of section "[edit]" links and footnote numbers
+    such as "[12]" or "[citation needed]" (Wikipedia and other MediaWiki sites).
+    Read aloud, they come out as "edit" and "twelve" in the middle of sentences.
+    Only these exact shapes are removed, so other bracketed text is still read.
+    """
+    text = REFERENCE_MARK.sub("", text)
+    lines = [line for line in text.splitlines() if line.strip()]
+    return "\n".join(lines)
+
+
 def extract(request):
     """Downloads a web page and returns its main article text (no menus, ads, or comments)."""
     import trafilatura
@@ -69,6 +87,9 @@ def extract(request):
     if page is None:
         raise RuntimeError(f"Could not download {url}. The site may block apps, or it may need a login.")
     text = trafilatura.extract(page, include_comments=False, include_tables=False)
+    if not text:
+        raise RuntimeError(f"Found no article text on {url}.")
+    text = strip_reference_marks(text)
     if not text:
         raise RuntimeError(f"Found no article text on {url}.")
     metadata = trafilatura.extract_metadata(page)

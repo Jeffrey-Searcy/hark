@@ -18,8 +18,11 @@
 #   HARK_NOTARY_PROFILE="hark-notary" ./release.sh
 #       HARK_NOTARY_PROFILE is the name you gave `xcrun notarytool store-credentials`.
 #   ./release.sh --unsigned
-#       Test build for this Mac only: ad-hoc signed (still with the hardened runtime),
-#       not notarized. Other Macs will refuse to open it.
+#       Free build (no Apple Developer account): ad-hoc signed (still with the hardened
+#       runtime), not notarized. On other Macs, macOS first says it "could not verify"
+#       Hark; the buyer allows it once in System Settings → Privacy & Security →
+#       Open Anyway. Each new version needs that step again, and macOS asks for the
+#       mic, system audio, and browser permissions again after each update.
 #
 # Needs: Xcode Command Line Tools, cmake (brew install cmake), git, curl.
 # Output: build/release/Hark-<version>.dmg (version comes from Resources/Info.plist).
