@@ -1,7 +1,7 @@
 //
 // FloatingBar.swift — the small always-on-top control bar.
 //
-// Layout (idle):       ⋮⋮  ● Record   🎤 Mic on   ⋯
+// Layout (idle):       ⋮⋮  ● Record   🎤 Mic on   🔊 Read Page   ⋯
 //        (recording):  ⋮⋮  ■ Stop 0:42  🎤 Mic on  ⋯
 //        (after stop): ⋮⋮  ✓ Transcript saved   Open   ✕
 //        (reading):    ⋮⋮  ⏮ ⏸ ⏭  12 / 40          ✕     (Read Aloud player; replaces the rest)
@@ -15,7 +15,7 @@ import SwiftUI
 
 /// Panel that hosts `FloatingBarView`.
 final class FloatingBarPanel: NSPanel {
-    static let size = NSSize(width: 290, height: 44)
+    static let size = NSSize(width: 340, height: 44)
     private static let originKey = "barOrigin"
 
     /// Creates the panel at its saved spot (or bottom-right of the main screen) and shows it.
@@ -91,6 +91,11 @@ struct FloatingBarView: View {
                 Text("Record")
             } action: { model.toggleRecording() }
             micButton
+            // why: only when idle; Read Aloud is blocked while recording, so the button would only show an error.
+            BarButton(tint: .white.opacity(0.08), help: "Read the article in your front browser window aloud") {
+                Image(systemName: "speaker.wave.2.fill")
+                Text("Read Page")
+            } action: { reader.readFrontPage() }
             Spacer(minLength: 0)
             moreMenu
         case let .recording(since):
@@ -148,6 +153,12 @@ struct FloatingBarView: View {
                 .font(.system(size: 11)).monospacedDigit().foregroundStyle(.secondary)
                 .help(reader.currentSentence ?? "")
             Spacer(minLength: 0)
+            Button { reader.showWindow?(true) } label: {
+                Image(systemName: "text.alignleft").font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+                    .frame(width: 20, height: 20)
+            }
+            .buttonStyle(.plain)
+            .help("Show the text being read")
             stopReadingButton
         }
     }
@@ -175,9 +186,12 @@ struct FloatingBarView: View {
     private var moreMenu: some View {
         Menu {
             Button("Show Transcripts") { model.showLibrary?(nil) }
+            Button("Show Read Aloud Window") { reader.showWindow?(true) }
             Divider()
+            Button("Read This Page") { reader.readFrontPage() }
             Button("Read Copied Text or Link") { reader.readClipboard() }
             Text("Read Selected Text: ⌃⌥R")
+            Text("Or right-click selected text → Services → Read Aloud with Hark")
             Picker("Reading Voice", selection: $reader.voice) {
                 ForEach(ReaderModel.voices) { voice in Text(voice.name).tag(voice.id) }
             }

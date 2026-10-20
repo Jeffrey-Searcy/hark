@@ -3,7 +3,9 @@
 # ad-hoc signs it, and installs it to ~/Applications so Spotlight can launch it.
 # Note: ad-hoc signing means macOS treats every rebuild as a new app, so the
 # mic / system-audio / Accessibility permissions must be granted again after each rebuild.
-# Read Aloud also needs a one-time ./Resources/setup-reader.sh (Python env + voice model).
+# This is the developer build: whisper-cli and uv come from Homebrew. Missing model files
+# or a missing Read Aloud environment are fetched by the app's setup window on launch
+# (or by ./Resources/setup-reader.sh for Read Aloud). For the build you sell, see release.sh.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -17,6 +19,7 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 mkdir -p "$APP/Contents/Resources"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 cp Resources/reader_helper.py "$APP/Contents/Resources/reader_helper.py"
+cp Resources/reader-requirements.txt "$APP/Contents/Resources/reader-requirements.txt"
 codesign --force --sign - "$APP"
 
 mkdir -p "$HOME/Applications"

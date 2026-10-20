@@ -24,6 +24,11 @@ enum ReaderError: LocalizedError {
     case helperFailed(String)
     case helperExited(code: Int32, log: String)
     case playbackFailed(String)
+    case noBrowser
+    case browserCantShare(String)
+    case browserNotAllowed(String)
+    case browserFailed(browser: String, detail: String)
+    case notAWebPage(String)
 
     var errorDescription: String? {
         switch self {
@@ -47,6 +52,16 @@ enum ReaderError: LocalizedError {
             return "The Read Aloud helper stopped (exit code \(code)).\n\(log)"
         case let .playbackFailed(detail):
             return "Could not play the audio: \(detail)"
+        case .noBrowser:
+            return "No browser window is open. Open the page in Safari, Chrome, Arc, Edge, Brave, or Vivaldi, then try again."
+        case let .browserCantShare(name):
+            return "\(name) doesn't let other apps see which page is open. Copy the page's address (⌘L, then ⌘C) and use \"Read Copied Text or Link\" instead."
+        case let .browserNotAllowed(name):
+            return "Hark isn't allowed to ask \(name) which page is open. Turn on \(name) under Hark in System Settings → Privacy & Security → Automation, then try again."
+        case let .browserFailed(browser, detail):
+            return "Couldn't get the page from \(browser): \(detail)"
+        case let .notAWebPage(address):
+            return "The front tab isn't a web page (\(address.isEmpty ? "it is empty" : address)). Open an article, then try again."
         }
     }
 }

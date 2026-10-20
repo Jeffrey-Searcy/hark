@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hark.entitlements — permissions the release build asks for under the hardened runtime
+  (Apple requires the hardened runtime for notarization). Used by release.sh only.
+    audio-input:     lets macOS show the microphone prompt; without it the mic is silently refused.
+    apple-events:    lets "Read This Page" ask the browser for the front tab's address.
+  System-audio capture (the Core Audio process tap) needs no entitlement, only the
+  NSAudioCaptureUsageDescription text in Info.plist.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.device.audio-input</key>
+	<true/>
+	<key>com.apple.security.automation.apple-events</key>
+	<true/>
+</dict>
+</plist>

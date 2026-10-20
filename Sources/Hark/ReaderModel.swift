@@ -5,8 +5,11 @@
 // (ReaderEngine) turns each sentence into a small WAV file, staying up to
 // `lookahead` sentences ahead of the one playing, so there are no gaps.
 // ⏭ / ⏮ jump one sentence; ⏮ first restarts the current sentence if it has played
-// for more than 2 seconds. The WAV files live in a temporary folder under
+// for more than 2 seconds. jump(to:) goes straight to any sentence (the reading
+// window calls it when you click one). The WAV files live in a temporary folder under
 // AppPaths.readerCache that is deleted when reading stops.
+// Ways to start: read(_:) for text or a link, readClipboard(), and readFrontPage(),
+// which asks the front browser for its tab's address (see BrowserPage).
 // All members are used on the main thread only.
 //
 
@@ -21,6 +24,13 @@ enum ReaderState: Equatable {
     case preparing(String)
     /// Reading sentence `index` (0-based) of `total`. `waiting` = that sentence's audio isn't made yet.
     case playing(index: Int, total: Int, paused: Bool, waiting: Bool)
+}
+
+/// One sentence to read. `paragraph` numbers the input line it came from, so the
+/// reading window can lay the text out in its original paragraphs.
+struct Sentence: Equatable {
+    let text: String
+    let paragraph: Int
 }
 
 /// Owns the sentence list, the audio player, and the helper. One instance for the app's lifetime.
@@ -59,11 +69,18 @@ final class ReaderModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
     }
 
+    /// The text being read, split into sentences; empty when idle. Shown by the reading window.
+    @Published private(set) var sentences: [Sentence] = []
+    /// Where the text came from, e.g. "nytimes.com" for an article; nil for text you selected or copied.
+    @Published private(set) var sourceName: String?
+
     /// Returns why reading can't start right now (e.g. recording), or nil if it can. Set by AppDelegate.
     var blockReason: (() -> String?)?
+    /// Shows the reading window. `activate` = bring Hark to the front; false shows it without
+    /// taking focus (used when a reading starts while you're in another app). Set by AppDelegate.
+    var showWindow: ((_ activate: Bool) -> Void)?
 
     private let engine = ReaderEngine()
-    private var sentences: [String] = []
     private var current = 0
     private var paused = false
     /// Sentence index → its finished WAV file.
@@ -77,7 +94,7 @@ final class ReaderModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var runToken = 0
 
     /// The sentence being read, shown as a tooltip on the player.
-    var currentSentence: String? { sentences.indices.contains(current) ? sentences[current] : nil }
+    var currentSentence: String? { sentences.indices.contains(current) ? sentences[current].text : nil }
 
     override init() {
         // why: register(defaults:) makes "George" the documented starting voice, not a hidden fallback.
@@ -95,7 +112,23 @@ final class ReaderModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             readArticle(at: url)
         } else {
             guard let token = begin() else { return }
-            start(Self.sentences(in: trimmed), token: token)
+            start(Self.sentences(in: trimmed), source: nil, token: token)
+        }
+    }
+
+    /// Reads the article in the front browser tab (Safari, Chrome, Arc, Edge, Brave, Vivaldi).
+    /// macOS asks once per browser whether Hark may do this.
+    func readFrontPage() {
+        // why: check first, so macOS doesn't ask for browser permission when reading isn't allowed anyway.
+        if let reason = blockReason?() {
+            presentError("Can't read aloud right now", ReaderError.blocked(reason))
+            return
+        }
+        BrowserPage.frontTabURL { [weak self] result in
+            switch result {
+            case let .success(url): self?.readArticle(at: url)
+            case let .failure(error): presentError("Can't read this page", error)
+            }
         }
     }
 
@@ -118,7 +151,7 @@ final class ReaderModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             switch result {
             case let .success(reply):
                 let parts = [reply.title, reply.text].compactMap { $0 }.filter { !$0.isEmpty }
-                self.start(Self.sentences(in: parts.joined(separator: "\n")), token: token)
+                self.start(Self.sentences(in: parts.joined(separator: "\n")), source: url.host(), token: token)
             case let .failure(error):
                 self.stop()
                 presentError("Couldn't read that page", error)
@@ -136,8 +169,12 @@ final class ReaderModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         return runToken
     }
 
-    /// Sets up the temporary folder and starts making audio for the first sentences.
-    private func start(_ list: [String], token: Int) {
+    /// Sets up the temporary folder, starts making audio for the first sentences, and shows the reading window.
+    /// - Parameters:
+    ///   - list: the sentences to read.
+    ///   - source: shown in the reading window (a site name), or nil.
+    ///   - token: the run token from begin(); a stale token means another reading took over.
+    private func start(_ list: [Sentence], source: String?, token: Int) {
         guard token == runToken else { return }
         guard !list.isEmpty else {
             stop()
@@ -154,10 +191,12 @@ final class ReaderModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
         cacheDir = dir
         sentences = list
+        sourceName = source
         current = 0
         paused = false
         publish()
         pump()
+        showWindow?(false)
     }
 
     // MARK: Controls
@@ -174,6 +213,13 @@ final class ReaderModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func next() {
         guard cacheDir != nil else { return }
         if current + 1 < sentences.count { go(to: current + 1) } else { stop() }
+    }
+
+    /// Plays sentence `index` right away (resuming if paused). Used when a sentence is clicked.
+    func jump(to index: Int) {
+        guard cacheDir != nil, sentences.indices.contains(index) else { return }
+        paused = false
+        go(to: index)
     }
 
     /// Restarts the current sentence if it has played for over 2 s; otherwise goes back one.
@@ -193,6 +239,7 @@ final class ReaderModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         player?.stop()
         player = nil
         sentences = []
+        sourceName = nil
         ready = [:]
         current = 0
         paused = false
@@ -246,7 +293,7 @@ final class ReaderModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         // why: a new file name per request, so a re-made sentence (after a voice change) never collides.
         let out = dir.appendingPathComponent("\(index)-\(UUID().uuidString.prefix(8)).wav")
         let requestedVoice = voice
-        engine.send(.speak(sentences[index], voice: requestedVoice, speed: Self.speed, out: out)) { [weak self] result in
+        engine.send(.speak(sentences[index].text, voice: requestedVoice, speed: Self.speed, out: out)) { [weak self] result in
             guard let self else { return }
             guard token == self.runToken else {
                 // why: reading stopped while this was being made; stop() left the folder for us to delete.
@@ -312,18 +359,23 @@ final class ReaderModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     /// Splits text into sentences. Each line is split on its own, so headings without a period
     /// don't run into the next paragraph. Pieces with no letters or digits (bullets, dashes) are dropped.
-    static func sentences(in text: String) -> [String] {
-        var result: [String] = []
+    /// - Returns: sentences in order, each tagged with the number of the (non-empty) line it came from.
+    static func sentences(in text: String) -> [Sentence] {
+        var result: [Sentence] = []
         let tokenizer = NLTokenizer(unit: .sentence)
+        var paragraphNumber = 0
         for line in text.components(separatedBy: .newlines) {
             let paragraph = line.trimmingCharacters(in: .whitespaces)
             guard !paragraph.isEmpty else { continue }
             tokenizer.string = paragraph
             tokenizer.enumerateTokens(in: paragraph.startIndex..<paragraph.endIndex) { range, _ in
                 let sentence = paragraph[range].trimmingCharacters(in: .whitespacesAndNewlines)
-                if sentence.rangeOfCharacter(from: .alphanumerics) != nil { result.append(sentence) }
+                if sentence.rangeOfCharacter(from: .alphanumerics) != nil {
+                    result.append(Sentence(text: sentence, paragraph: paragraphNumber))
+                }
                 return true
             }
+            paragraphNumber += 1
         }
         return result
     }

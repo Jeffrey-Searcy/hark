@@ -25,9 +25,12 @@ if arguments.count == 3, arguments[1] == "--transcribe" {
     }
 }
 
-let app = NSApplication.shared
-let delegate = AppDelegate()
-app.delegate = delegate
-// why: .regular gives the app a Dock icon and menu bar, so the main window is easy to find.
-app.setActivationPolicy(.regular)
-app.run()
+// why: top-level code runs on the main thread; this tells the compiler so it can build the @MainActor delegate.
+MainActor.assumeIsolated {
+    let app = NSApplication.shared
+    let delegate = AppDelegate()
+    app.delegate = delegate
+    // why: .regular gives the app a Dock icon and menu bar, so the main window is easy to find.
+    app.setActivationPolicy(.regular)
+    app.run()
+}

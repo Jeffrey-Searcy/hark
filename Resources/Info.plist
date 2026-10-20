@@ -20,11 +20,34 @@
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>15.0</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Hark asks your browser which page is open so it can read that article aloud. It reads nothing else.</string>
 	<key>NSAudioCaptureUsageDescription</key>
 	<string>Hark records the sound your computer plays (meetings, calls, videos) so it can transcribe it.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Hark records your microphone so your own words show up as "Me" in the transcript.</string>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Read Aloud with Hark</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>readAloud</string>
+			<key>NSPortName</key>
+			<string>Hark</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendTypes</key>
+			<array>
+				<string>public.plain-text</string>
+				<string>NSStringPboardType</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
